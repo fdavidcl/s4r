@@ -5,7 +5,6 @@ experiment <- function(dataset, autoencoder_f, method, normalize = TRUE) {
   ## Prepare dataset
   k <- 5
   train_idx <- createFolds(dataset$y, k = k)
-  message(str(train_idx))
 
   results <- list()
 
@@ -15,17 +14,19 @@ experiment <- function(dataset, autoencoder_f, method, normalize = TRUE) {
     test_x <- dataset$x[train_idx[[i]],]
     test_y <- dataset$y[train_idx[[i]]]
 
-    if (normalize) {
+    if (dataset$normalize) {
       mx <- apply(train_x, 2, max)
       mn <- apply(train_x, 2, min)
-      range <- mx - mn
-      train_x <- t(apply(train_x, 1, function(x) (x - mn) / range))
-      test_x <- t(apply(test_x, 1, function(x) (x - mn) / range))
+      # Avoid division by zero
+      range_n <- max(mx - mn, keras::k_epsilon())
+
+      train_x <- t(apply(train_x, 1, function(x) (x - mn) / range_n))
+      test_x <- t(apply(test_x, 1, function(x) (x - mn) / range_n))
     }
 
-    model <- train_model(autoencoder_f, method, train_x, train_y, normalized = normalize)
-    predictions <- test_model(model, test_x)
-    results[[i]] <- evaluate_model(test_y, predictions)
+    model <- train_model(autoencoder_f, method, train_x, train_y, normalized = TRUE)
+    outs <- test_model(model, test_x)
+    results[[i]] <- c(evaluate_features(outs$features, test_y), evaluate_model(test_y, outs$predictions))
   }
 
   results
@@ -33,16 +34,16 @@ experiment <- function(dataset, autoencoder_f, method, normalize = TRUE) {
 
 #' @import purrr
 #' @export
-run_experiment <- function() {
-  keras::backend()$clear_session()
-
-  datasets <- dataset_list()
+run_experiment <- function(datasets = dataset_list()) {
+  options(keras.fit_verbose = 0)
 
   results <- map(datasets, function(dataset) {
+    keras::backend()$clear_session()
+    evaluate_features(dataset$x, dataset$y)
     # resultsnoae <- dataset %>% experiment(FALSE, "kknn")
-    resultsaered <- dataset %>% experiment(supercore, "kknn", normalize = TRUE)
+    resultsaered <- dataset %>% experiment(supercore, "kknn")
     resultspca <- dataset %>% experiment("pca", "kknn")
-    resultsae <- dataset %>% experiment(ruta::autoencoder, "kknn", normalize = TRUE)
+    resultsae <- dataset %>% experiment(ruta::autoencoder, "kknn")
 
     list(
       pca = resultspca,
@@ -54,3 +55,6 @@ run_experiment <- function() {
   saveRDS(results, file = "results.rds")
   results
 }
+
+# results <- run_experiment(list(read_data("data/wdbc.data", row.names = 1) %>% class_first("M")))
+# results[[1]] %>% map(function(x) x %>% map("fisher") %>% as.numeric %>% summary)

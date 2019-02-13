@@ -82,7 +82,7 @@ to_keras.ruta_loss_reductive <- function(loss, learner) {
   class_neg <- 1 - class_pos
 
   # count positive and negative instances
-  amount_pos <- keras::k_sum(class_pos) + keras::k_epsilon() # add epsilon to prevent NaN
+  amount_pos <- keras::k_sum(class_pos) + keras::k_epsilon()  # add epsilon to prevent NaN
   amount_neg <- keras::k_sum(class_neg) + keras::k_epsilon()
 
   # keeps the value of the encoding or zero according to each instance's class
@@ -101,6 +101,7 @@ to_keras.ruta_loss_reductive <- function(loss, learner) {
   fisher_gain <- keras::k_max(fisher_ratios)
 
   rec_loss <- (loss$reconstruction_loss %>% ruta:::to_keras(learner))(enc_input, decodification)
-  regularized_loss <- (rec_loss %>% keras::k_mean()) - loss$weight * fisher_gain
+  # regularized_loss <- (rec_loss %>% keras::k_mean()) - loss$weight * fisher_gain
+  regularized_loss <- (rec_loss %>% keras::k_mean()) - keras::k_tanh(fisher_gain)
   regularized_loss
 }

@@ -68,5 +68,7 @@ dataset_list <- function() {
   datasets$Yeast1vs7 <- yeast %>% vs_last("NUC", "VAC")
   datasets$Yeast1289vs7 <- yeast %>% vs_last("VAC", c("NUC", "CYT", "ERL", "POX"))
 
+  message("Normalizing ", names(datasets)[datasets %>% map("normalize") %>% as.logical()] %>% paste0(collapse = ", "))
+
   datasets
 }
