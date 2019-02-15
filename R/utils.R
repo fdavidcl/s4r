@@ -35,7 +35,8 @@ vs_last <- function(dataset, positive, negative)
 #' @import purrr
 train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
 
-  hidden_dim <- ceiling(0.1 * dim(train_x)[2])
+  # At least 2 generated features
+  hidden_dim <- max(ceiling(0.1 * dim(train_x)[2]), 2)
 
   if (is_logical(autoencoder_f) && autoencoder_f == FALSE) {
     feature_extractor <- function(x) return(x)
@@ -94,7 +95,9 @@ evaluate_features <- function(features, classes) {
     (colMeans(negative) - colMeans(positive)) ** 2 /
     (apply(negative, 2, var) + apply(positive, 2, var))
   max_fisher <- max(fisher_cols)
-  #message(fisher_cols %>% paste0(collapse = ", "))
+
+  # TODO: solve undefined cases (a lot in yeast and ecoli)
+
   list(
     fisher = max_fisher
   )

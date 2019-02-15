@@ -50,6 +50,20 @@ dataset_list <- function() {
   # Iris0: setosa vs remainder
   datasets$Iris0 <- iris %>% class_last("setosa")
 
+  # Isolet (letter names pronounced)
+  datasets$IsoletVowels <- read_data("data/isolettrain.data") %>% class_last(c(1, 5, 9, 15, 21))
+
+  # Satellite
+  datasets$SatelliteGrey <- read.table("data/sat.trn") %>% class_last(c(3, 4, 7))
+  datasets$SatelliteRed <- read.table("data/sat.trn") %>% class_last(1)
+
+  # Vehicle:
+  vehicle <- read.table("data/xfull.dat")
+  datasets$Vehicle0 <- vehicle %>% class_last("van")
+  datasets$Vehicle1 <- vehicle %>% class_last("saab")
+  datasets$Vehicle2 <- vehicle %>% class_last("bus")
+  datasets$Vehicle3 <- vehicle %>% class_last("opel")
+
   # https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data
   datasets$Wisconsin <- read_data("data/wdbc.data", row.names = 1) %>% class_first("M")
 

@@ -40,12 +40,13 @@ run_experiment <- function(datasets = dataset_list()) {
   results <- map(datasets, function(dataset) {
     keras::backend()$clear_session()
     evaluate_features(dataset$x, dataset$y)
-    # resultsnoae <- dataset %>% experiment(FALSE, "kknn")
+    resultsnoae <- dataset %>% experiment(FALSE, "kknn")
     resultsaered <- dataset %>% experiment(supercore, "kknn")
     resultspca <- dataset %>% experiment("pca", "kknn")
     resultsae <- dataset %>% experiment(ruta::autoencoder, "kknn")
 
     list(
+      baseline = resultsnoae,
       pca = resultspca,
       basic = resultsae,
       reductive = resultsaered
@@ -58,3 +59,27 @@ run_experiment <- function(datasets = dataset_list()) {
 
 # results <- run_experiment(list(read_data("data/wdbc.data", row.names = 1) %>% class_first("M")))
 # results[[1]] %>% map(function(x) x %>% map("fisher") %>% as.numeric %>% summary)
+
+get_tables <- function(results) {
+  results %>% map(function(ds) {
+    metrics <- names(ds[[1]][[1]])
+    #print(metrics)
+    table <- metrics %>% map(function(metric) {
+      #ds %>% map(metric) %>% as.numeric %>% mean
+      ds %>%
+        map(function(k) k %>% map(metric) %>% as.numeric() %>% mean(na.rm = TRUE)) %>%
+        do.call(cbind, .)
+    }) %>% do.call(rbind, .) %>% t()
+    colnames(table) <- metrics
+    table
+  })
+}
+
+print_tables <- function(tables) {
+  sink("results.md")
+  for (table in names(tables))  {
+    c("\n##", table) %>% paste0(collapse = " ") %>% cat()
+    tables[[table]] %>% knitr::kable(., format = "markdown") %>% print()
+  }
+  sink()
+}
