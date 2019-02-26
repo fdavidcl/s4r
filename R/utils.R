@@ -41,11 +41,13 @@ train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
   if (is_logical(autoencoder_f) && autoencoder_f == FALSE) {
     feature_extractor <- function(x) return(x)
     features <- train_x
-  } else if (is_character(autoencoder_f) && autoencoder_f == "pca") {
-    ## Extract features
+  } else if (is_character(autoencoder_f)) {
+    if (autoencoder_f == "pca") {
+      ## Extract features
 
-    pca <- train_x %>% prcomp(scale = FALSE, center = FALSE)
-    feature_extractor <- function(x) predict(pca, x)[, 1:hidden_dim] %>% array(c(dim(x)[1], hidden_dim)) %>% expand_dims() %>% name()
+      pca <- train_x %>% prcomp(scale = FALSE, center = FALSE)
+      feature_extractor <- function(x) predict(pca, x)[, 1:hidden_dim] %>% expand_dims() %>% name()
+    }
     features <- feature_extractor(train_x)
   } else {
     activation <- if (normalized) "sigmoid" else "linear"
@@ -96,7 +98,7 @@ evaluate_features <- function(features, classes) {
     (apply(negative, 2, var) + apply(positive, 2, var))
   max_fisher <- max(fisher_cols)
 
-  # TODO: solve undefined cases (a lot in yeast and ecoli)
+
 
   list(
     fisher = max_fisher

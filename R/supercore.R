@@ -98,7 +98,7 @@ to_keras.ruta_loss_reductive <- function(loss, learner) {
   variance_neg <- keras::k_sum(keras::k_square(encoding_if_neg), axis = 1) / amount_neg - keras::k_square(mean_neg)
 
   fisher_ratios <- keras::k_square(mean_pos - mean_neg) * (1 / (variance_pos + variance_neg + keras::k_epsilon()))
-  fisher_gain <- keras::k_max(fisher_ratios)
+  fisher_gain <- keras::k_mean(fisher_ratios)
 
   rec_loss <- (loss$reconstruction_loss %>% ruta:::to_keras(learner))(enc_input, decodification)
   # regularized_loss <- (rec_loss %>% keras::k_mean()) - loss$weight * fisher_gain

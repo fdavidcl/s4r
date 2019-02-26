@@ -3,9 +3,9 @@ dataset_list <- function() {
 
   # Abalone: 19 vs remainder
   abalone <- read_data("data/abalone.data")[, -1]
-  datasets$Abalone19 <- abalone %>% class_last(19)
+  # datasets$Abalone19 <- abalone %>% class_last(19)
   # Abalone: 9 vs 18
-  datasets$Abalone9vs18 <- abalone %>% vs_last(9, 18)
+  datasets$Abalone9vs18 <- abalone %>% vs_last(18, 9)
 
   ecoli <- read.table("data/ecoli.data")[, -1]
   # Ecoli0vs1 (im vs cp)
@@ -21,6 +21,8 @@ dataset_list <- function() {
   # Ecoli0137vs26
   datasets$Ecoli0137vs26 <- ecoli %>% vs_last(c("pp", "imL"), c("cp", "im", "imU", "imS"))
 
+  datasets$Gina <- read.csv("data/gina_agnostic.csv") %>% class_last(1)
+
   glass <- read_data("data/glass.data", row.names = 1)
   # Glass: building_windows_float_processed vs remainder
   datasets$Glass0 <- glass %>% class_last(1)
@@ -31,16 +33,20 @@ dataset_list <- function() {
   # Glass: containers vs remainder
   datasets$Glass4 <- glass %>% class_last(5)
   # Glass: tableware vs remainder
-  datasets$Glass5 <- glass %>% class_last(6)
+  # datasets$Glass5 <- glass %>% class_last(6)
   # non-window glass; remainder
   datasets$Glass0123vs456 <- glass %>% vs_last(5:7, 1:4)
   # ve-win-oat-proc vs build-win-oat-proc,build-win-non oat-proc,headlamps
   datasets$Glass016vs2 <- glass %>% vs_last(3, c(1,2,7))
   # tableware vs build-win-oat-proc,build-win-non oat-proc,headlamps
-  datasets$Glass016vs5 <- glass %>% vs_last(6, c(1,2,7))
+  # datasets$Glass016vs5 <- glass %>% vs_last(6, c(1,2,7))
 
   # Haberman: Die vs Survive
   datasets$Haberman <- read_data("data/haberman.data") %>% class_last(2)
+
+  datasets$Heart <- read.csv("data/heart-statlog.csv") %>% class_last("present")
+
+  datasets$Madelon <- cbind(read.table("data/madelon_train.data"), class = read.table("data/madelon_train.labels")) %>% class_last()
 
   # New-thyroid: hyper vs remainder
   datasets$New_thyroid1 <- read_data("data/new-thyroid.data") %>% class_first(2)
@@ -57,6 +63,8 @@ dataset_list <- function() {
   datasets$SatelliteGrey <- read.table("data/sat.trn") %>% class_last(c(3, 4, 7))
   datasets$SatelliteRed <- read.table("data/sat.trn") %>% class_last(1)
 
+  datasets$Sonar <- read.csv("data/sonar.csv") %>% class_last("Rock")
+
   # Vehicle:
   vehicle <- read.table("data/xfull.dat")
   datasets$Vehicle0 <- vehicle %>% class_last("van")
@@ -71,18 +79,37 @@ dataset_list <- function() {
   yeast <- read.table("data/yeast.data")[, -1]
   datasets$Yeast1 <- yeast %>% class_last("NUC")
   datasets$Yeast3 <- yeast %>% class_last("ME3")
-  datasets$Yeast4 <- yeast %>% class_last("ME2")
-  datasets$Yeast5 <- yeast %>% class_last("ME1")
-  datasets$Yeast6 <- yeast %>% class_last("EXC")
+  # datasets$Yeast4 <- yeast %>% class_last("ME2")
+  # datasets$Yeast5 <- yeast %>% class_last("ME1")
+  # datasets$Yeast6 <- yeast %>% class_last("EXC")
   # Yeast: classes vs other classes
-  datasets$Yeast2vs4 <- yeast %>% vs_last("CYT", "ME2")
+  datasets$Yeast2vs4 <- yeast %>% vs_last("ME2", "CYT")
   datasets$Yeast05679vs4 <- yeast %>% vs_last("ME2", c("MIT", "ME3", "EXC", "VAC", "ERL"))
-  datasets$Yeast1458vs7 <- yeast %>% vs_last("VAC", c("NUC", "ME3", "ME2", "POX"))
-  datasets$Yeast2vs8 <- yeast %>% vs_last("POX", "CYT")
-  datasets$Yeast1vs7 <- yeast %>% vs_last("NUC", "VAC")
-  datasets$Yeast1289vs7 <- yeast %>% vs_last("VAC", c("NUC", "CYT", "ERL", "POX"))
+  # datasets$Yeast1458vs7 <- yeast %>% vs_last("VAC", c("NUC", "ME3", "ME2", "POX"))
+  # datasets$Yeast2vs8 <- yeast %>% vs_last("POX", "CYT")
+  datasets$Yeast1vs7 <- yeast %>% vs_last("VAC", "NUC")
+  # datasets$Yeast1289vs7 <- yeast %>% vs_last("VAC", c("NUC", "CYT", "ERL", "POX"))
 
   message("Normalizing ", names(datasets)[datasets %>% map("normalize") %>% as.logical()] %>% paste0(collapse = ", "))
+  # ir <- datasets %>% map("y") %>% map(as.integer) %>% map(~ . - 1) %>% map(mean)
+  # message("Datasets with > 0.95 imbalance ratio: ", names(datasets)[ir <= 0.05] %>% paste0(collapse = ", "))
 
   datasets
+
+  # list(
+  #   gina = datasets$Gina,
+  #   heart = datasets$Heart,
+  #   sonar = datasets$Sonar
+  # )
+
+  # list(madelon = datasets$Madelon)
+}
+
+dataset_metrics <- function(datasets = dataset_list()) {
+  map2(datasets, names(datasets), function(ds, name) {
+    data.frame(
+      name = name,
+      minratio = ds$y %>% as.integer() %>% `-`(1) %>% mean()
+    )
+  }) %>% do.call(rbind, .)
 }

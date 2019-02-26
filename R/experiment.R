@@ -34,16 +34,16 @@ experiment <- function(dataset, autoencoder_f, method, normalize = TRUE) {
 
 #' @import purrr
 #' @export
-run_experiment <- function(datasets = dataset_list()) {
+run_experiment <- function(datasets = dataset_list(), filename = "results.rds", classifier = "kknn") {
   options(keras.fit_verbose = 0)
 
   results <- map(datasets, function(dataset) {
     keras::backend()$clear_session()
     evaluate_features(dataset$x, dataset$y)
-    resultsnoae <- dataset %>% experiment(FALSE, "kknn")
-    resultsaered <- dataset %>% experiment(supercore, "kknn")
-    resultspca <- dataset %>% experiment("pca", "kknn")
-    resultsae <- dataset %>% experiment(ruta::autoencoder, "kknn")
+    resultsnoae <- dataset %>% experiment(FALSE, classifier)
+    resultsaered <- dataset %>% experiment(supercore, classifier)
+    resultspca <- dataset %>% experiment("pca", classifier)
+    resultsae <- dataset %>% experiment(ruta::autoencoder, classifier)
 
     list(
       baseline = resultsnoae,
@@ -53,7 +53,7 @@ run_experiment <- function(datasets = dataset_list()) {
     )
   })
 
-  saveRDS(results, file = "results.rds")
+  saveRDS(results, file = filename)
   results
 }
 
