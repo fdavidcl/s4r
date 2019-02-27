@@ -90,21 +90,6 @@ test_model <- function(model, test_x) {
   list(features = features, predictions = predictions)
 }
 
-evaluate_features <- function(features, classes) {
-  negative <- features[classes == 0,] %>% expand_dims()
-  positive <- features[classes == 1,] %>% expand_dims()
-  fisher_cols <-
-    (colMeans(negative) - colMeans(positive)) ** 2 /
-    (apply(negative, 2, var) + apply(positive, 2, var))
-  max_fisher <- max(fisher_cols)
-
-
-
-  list(
-    fisher = max_fisher
-  )
-}
-
 evaluate_model <- function(true_y, pred_y) {
   tp <- sum(true_y == pred_y & true_y == 1)
   tn <- sum(true_y == pred_y & true_y == 0)

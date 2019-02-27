@@ -109,7 +109,7 @@ dataset_metrics <- function(datasets = dataset_list()) {
   map2(datasets, names(datasets), function(ds, name) {
     data.frame(
       name = name,
-      minratio = ds$y %>% as.integer() %>% `-`(1) %>% mean()
+      minratio = dcme::proportion_examples_minority(ds$y)
     )
   }) %>% do.call(rbind, .)
 }

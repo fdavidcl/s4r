@@ -77,7 +77,7 @@ get_tables <- function(results) {
 
 print_tables <- function(tables) {
   sink("results.md")
-  for (table in names(tables))  {
+  for (table in names(tables)) {
     c("\n##", table) %>% paste0(collapse = " ") %>% cat()
     tables[[table]] %>% knitr::kable(., format = "markdown") %>% print()
   }
