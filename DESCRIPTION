@@ -8,5 +8,5 @@ Description: Custom autoencoder regularized with Fisher's Maximum Discriminant R
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: ruta, keras, purrr
+Imports: ruta, keras, purrr, scmamp
 RoxygenNote: 6.1.1

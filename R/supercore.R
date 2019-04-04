@@ -100,8 +100,12 @@ to_keras.ruta_loss_reductive <- function(loss, learner) {
   fisher_ratios <- keras::k_square(mean_pos - mean_neg) * (1 / (variance_pos + variance_neg + keras::k_epsilon()))
   fisher_gain <- keras::k_mean(fisher_ratios)
 
+  # Normalization as seen in https://github.com/lpfgarcia/ECoL/. Now complexity is reduced when the metric is reduced
+  # fisher_loss_normalized <- 1 / (fisher_gain + 1)
+  fisher_gain_normalized <- keras::k_tanh(fisher_gain)
+
   rec_loss <- (loss$reconstruction_loss %>% ruta:::to_keras(learner))(enc_input, decodification)
   # regularized_loss <- (rec_loss %>% keras::k_mean()) - loss$weight * fisher_gain
-  regularized_loss <- (rec_loss %>% keras::k_mean()) - keras::k_tanh(fisher_gain)
+  regularized_loss <- (rec_loss %>% keras::k_mean()) - fisher_gain_normalized
   regularized_loss
 }

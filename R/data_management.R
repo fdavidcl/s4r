@@ -7,6 +7,8 @@ dataset_list <- function() {
   # Abalone: 9 vs 18
   datasets$Abalone9vs18 <- abalone %>% vs_last(18, 9)
 
+  datasets$Bioresponse <- read.csv("data/bioresponse.csv") %>% class_last()
+
   ecoli <- read.table("data/ecoli.data")[, -1]
   # Ecoli0vs1 (im vs cp)
   datasets$Ecoli0vs1 <- ecoli %>% vs_last("im", "cp")
@@ -21,7 +23,9 @@ dataset_list <- function() {
   # Ecoli0137vs26
   datasets$Ecoli0137vs26 <- ecoli %>% vs_last(c("pp", "imL"), c("cp", "im", "imU", "imS"))
 
-  datasets$Gina <- read.csv("data/gina_agnostic.csv") %>% class_last(1)
+  datasets$Gina <- read.csv("data/gina_agnostic.csv") %>% class_last()
+
+  # datasets$Gisette <- RWeka::read.arff("data/gisette.arff") %>% class_last()
 
   glass <- read_data("data/glass.data", row.names = 1)
   # Glass: building_windows_float_processed vs remainder
@@ -95,14 +99,17 @@ dataset_list <- function() {
   # message("Datasets with > 0.95 imbalance ratio: ", names(datasets)[ir <= 0.05] %>% paste0(collapse = ", "))
 
   datasets
-
-  # list(
-  #   gina = datasets$Gina,
-  #   heart = datasets$Heart,
-  #   sonar = datasets$Sonar
-  # )
+#
+#   list(
+#     gina = datasets$Gina,
+#     heart = datasets$Heart,
+#     sonar = datasets$Sonar,
+#     madelon = datasets$Madelon,
+#     yeast = datasets$Yeast1
+#   )
 
   # list(madelon = datasets$Madelon)
+  # list(gisette = datasets$Gisette, bioresponse = datasets$Bioresponse)
 }
 
 dataset_metrics <- function(datasets = dataset_list()) {

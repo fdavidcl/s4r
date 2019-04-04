@@ -35,8 +35,10 @@ vs_last <- function(dataset, positive, negative)
 #' @import purrr
 train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
 
+  max_for_10ppd <- ceiling(0.1 * nrow(train_x))
+  ten_percent <- ceiling(0.1 * ncol(train_x))
   # At least 2 generated features
-  hidden_dim <- max(ceiling(0.1 * dim(train_x)[2]), 2)
+  hidden_dim <- max(min(max_for_10ppd, ten_percent), 2)
 
   if (is_logical(autoencoder_f) && autoencoder_f == FALSE) {
     feature_extractor <- function(x) return(x)
@@ -59,9 +61,11 @@ train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
     feature_extractor <- autoencoder_f(network, loss = loss)
     #print(feature_extractor)
     feature_extractor <- if (is_reductive(feature_extractor))
-      feature_extractor %>% train.supercore(train_x, classes = as.numeric(train_y) - 1, epochs = 100)
+      feature_extractor %>% train.supercore(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+    else if (is_svm(feature_extractor))
+      feature_extractor %>% train.svmae(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
     else
-      feature_extractor %>% ruta::train(train_x, epochs = 100)
+      feature_extractor %>% ruta::train(train_x, epochs = 200)
 
     feature_extractor <- purrr::compose(name, expand_dims, purrr::partial(ruta::encode, learner = feature_extractor, .lazy = FALSE))
     features <- feature_extractor(train_x)
@@ -95,13 +99,20 @@ evaluate_model <- function(true_y, pred_y) {
   tn <- sum(true_y == pred_y & true_y == 0)
   fp <- sum(true_y != pred_y & true_y == 0)
   fn <- sum(true_y != pred_y & true_y == 1)
+  n <- length(true_y)
 
-  list(
-    accuracy = mean(true_y == pred_y),
-    sensitivity = tp / (tp + fn),
-    specificity = tn / (tn + fp),
-    precision = tp / (tp + fp),
-    fscore = 2 * tp / (2 * tp + fp + fn)
+  accuracy <- mean(true_y == pred_y)
+  sensitivity <- tp / (tp + fn)
+  specificity <- tn / (tn + fp)
+  precision <- tp / (tp + fp)
+  kappa <- 1 - (1 - accuracy) / (1 - (tp + fp)/n * (tp + fn)/n - (tn + fn)/n * (tn + fp)/n)
+  fscore <- 2 * tp / (2 * tp + fp + fn)
+  auc <- pROC::auc(true_y %>% as.numeric(), pred_y %>% as.numeric())
+
+  metrics <- list(
+    fscore = fscore,
+    kappa = kappa,
+    auc = auc
   )
 }
 
