@@ -42,16 +42,18 @@ run_experiment <- function(datasets = dataset_list(), filename = "results.rds", 
     evaluate_features(dataset$x, dataset$y)
     resultsnoae <- dataset %>% experiment(FALSE, classifier)
     resultsaered <- dataset %>% experiment(supercore, classifier)
-    # resultspca <- dataset %>% experiment("pca", classifier)
-    # resultsae <- dataset %>% experiment(ruta::autoencoder, classifier)
+    resultspca <- dataset %>% experiment("pca", classifier)
+    resultsae <- dataset %>% experiment(ruta::autoencoder, classifier)
     resultssvm <- dataset %>% experiment(svmae, classifier)
+    resultscom <- dataset %>% experiment(combinedae, classifier)
 
     list(
       baseline = resultsnoae,
-      # pca = resultspca,
+      pca = resultspca,
       svm = resultssvm,
-      # basic = resultsae,
-      reductive = resultsaered
+      basic = resultsae,
+      supercore = resultsaered,
+      combined = resultscom
     )
   })
 
@@ -92,8 +94,10 @@ myrank <- function(x, decreasing = FALSE, ...) {
 }
 
 #' @import scmamp
-get_tests <- function(result_file, quiet = T) {
-  results <- readRDS(result_file)
+get_tests <- function(results = NULL, result_file = NULL, quiet = T) {
+  if (is.null(results))
+    results <- readRDS(result_file)
+
   tab <- results %>% get_tables()
 
   metrics <- colnames(tab[[1]])
@@ -172,10 +176,13 @@ get_tests <- function(result_file, quiet = T) {
     different = do.call(rbind, different_table)
   )
 
-  colnames(results$ranking) <- colnames(metric_results)
-  colnames(results$different) <- colnames(metric_results)[-4]
+  # colnames(results$ranking) <- colnames(metric_results)
+  # colnames(results$different) <- colnames(metric_results)
   results
 }
+
+## TODO: combinar supercore y l2svm, seleccionar datasets alta dimensionalidad
+## la propuesta no sería la combinación sino cada una por separado
 
 print_all_tests <- function() {
   files <- c(dir("config_200ep_gain", full.names = T), dir("config_200ep_loss", full.names = T))

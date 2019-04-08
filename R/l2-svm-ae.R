@@ -101,9 +101,12 @@ to_keras.ruta_loss_svm <- function(loss, learner) {
 }
 
 test_svm_iris <- function(cl = "versicolor", weight = 1) {
+  dat <- as.matrix(iris[,1:4])
+  intrain <- sample(1:150, 100)
   ae <- svmae(input() + dense(10, "relu") + dense(2, "sigmoid") + dense(10, "relu") + output(), "mean_squared_error", "svm", weight)
-  ae <- train.svmae(ae, as.matrix(iris[,1:4]), as.numeric(iris$Species == cl), epochs = 200)
-  ae %>% encode(as.matrix(iris[,1:4])) %>% plot(col = as.numeric(iris$Species == cl) + 1)
+  ae <- train.svmae(ae, dat[intrain,], as.numeric(iris$Species == cl), epochs = 200)
+  print(mean(abs(decode(ae, encode(ae, dat[-intrain,])) - dat[-intrain,])))
+  ae %>% encode(dat) %>% plot(col = as.numeric(iris$Species == cl) + 1)
 }
 
 test_sc_iris <- function(cl = "versicolor", weight = 1) {

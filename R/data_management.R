@@ -99,14 +99,14 @@ dataset_list <- function() {
   # message("Datasets with > 0.95 imbalance ratio: ", names(datasets)[ir <= 0.05] %>% paste0(collapse = ", "))
 
   datasets
-#
-#   list(
-#     gina = datasets$Gina,
-#     heart = datasets$Heart,
-#     sonar = datasets$Sonar,
-#     madelon = datasets$Madelon,
-#     yeast = datasets$Yeast1
-#   )
+
+  # list(
+  #   # gina = datasets$Gina,
+  #   # heart = datasets$Heart,
+  #   # sonar = datasets$Sonar,
+  #   madelon = datasets$Madelon,
+  #   yeast = datasets$Yeast1
+  # )
 
   # list(madelon = datasets$Madelon)
   # list(gisette = datasets$Gisette, bioresponse = datasets$Bioresponse)

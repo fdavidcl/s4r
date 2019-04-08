@@ -60,10 +60,12 @@ train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
     loss <- if (normalized) "binary_crossentropy" else "mean_squared_error"
     feature_extractor <- autoencoder_f(network, loss = loss)
     #print(feature_extractor)
-    feature_extractor <- if (is_reductive(feature_extractor))
-      feature_extractor %>% train.supercore(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+    feature_extractor <- if (is_combined(feature_extractor))
+      feature_extractor %>% train.combined(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
     else if (is_svm(feature_extractor))
       feature_extractor %>% train.svmae(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+    else if (is_reductive(feature_extractor))
+      feature_extractor %>% train.supercore(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
     else
       feature_extractor %>% ruta::train(train_x, epochs = 200)
 
