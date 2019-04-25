@@ -33,7 +33,7 @@ vs_last <- function(dataset, positive, negative)
   vs(dataset, class_pos = ncol(dataset), positive, negative)
 
 #' @import purrr
-train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
+train_model <- function(autoencoder_f, method, train_x, train_y, normalized, ...) {
 
   max_for_10ppd <- ceiling(0.1 * nrow(train_x))
   ten_percent <- ceiling(0.1 * ncol(train_x))
@@ -58,7 +58,7 @@ train_model <- function(autoencoder_f, method, train_x, train_y, normalized) {
     # Do not use binary crossentropy (and sigmoid activation) *unless* the data has been
     # accordingly normalized (to the [0, 1] interval)
     loss <- if (normalized) "binary_crossentropy" else "mean_squared_error"
-    feature_extractor <- autoencoder_f(network, loss = loss)
+    feature_extractor <- autoencoder_f(network, loss = loss, ...)
     #print(feature_extractor)
     feature_extractor <- if (is_combined(feature_extractor))
       feature_extractor %>% train.combined(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
