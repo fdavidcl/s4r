@@ -1,5 +1,5 @@
 ## Classes
-svmae <- "svmae"
+svmaeclass <- "svmae"
 ruta_loss_svm <- "ruta_loss_svm"
 
 #' @import purrr
@@ -10,7 +10,7 @@ svmae <- function(network, loss, method = "svm", weight = 1) {
 
 make_svm <- function(learner, method = "svm", weight = 1) {
   learner$loss <- loss_svm(learner$loss, method, weight)
-  class(learner) <- c(svmae, class(learner))
+  class(learner) <- c(svmaeclass, class(learner))
   learner
 }
 
@@ -89,7 +89,7 @@ to_keras.ruta_loss_svm <- function(loss, learner) {
   decodification <- learner$models$autoencoder$output[[1]]
   t_n <- 2 * class_pos - 1 # class \in {-1, 1}
 
-  sum_term <- keras::k_square(keras::k_max(1 - svm_out * t_n, 0))
+  sum_term <- keras::k_square(1 - svm_out * t_n)
   svm_loss <- keras::k_sum(sum_term)
 
   weight_reg <- keras::k_sum(svm_weight * svm_weight) / 2
