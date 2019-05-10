@@ -1,12 +1,14 @@
-Package: supercore
+Package: s4r
 Type: Package
-Title: Supervised Complexity Reduction Autoencoder
+Title: Autoencoders for Supervised Complexity Reduction
 Version: 0.1.0
 Author: David Charte
 Maintainer: David Charte <fdavidcl@ugr.es>
-Description: Custom autoencoder regularized with Fisher's Maximum Discriminant Ratio
+Description: Implementations of custom autoencoders based on the Ruta package:
+    (1) Scorer is regularized with Fisher's Discriminant Ratio, and
+    (2) Slicer uses a LS-SVM-based penalty to achieve better class separability.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: ruta, keras, purrr, scmamp
+Imports: ruta, keras, purrr, scmamp, dcme
 RoxygenNote: 6.1.1
