@@ -30,14 +30,14 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              partial(encode, learner = feature_extractor, .lazy = FALSE)
            },
            scorer = {
-             feature_extractor <- supercore(network, loss = loss, ...) %>%
-               train.supercore(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
-             partial(encode, learner = feature_extractor, .lazy = FALSE)
+             feature_extractor <- Slicer$new(network, loss = loss, ...)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             feature_extractor$encode
            },
            slicer = {
-             feature_extractor <- svmae(network, loss = loss, ...) %>%
-               train.svmae(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
-             partial(encode, learner = feature_extractor, .lazy = FALSE)
+             feature_extractor <- Slicer$new(network, loss = loss, ...)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             feature_extractor$encode
            },
            combined = {
              feature_extractor <- combinedae(network, loss = loss, ...) %>%
