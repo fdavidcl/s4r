@@ -30,19 +30,19 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              partial(encode, learner = feature_extractor, .lazy = FALSE)
            },
            scorer = {
-             feature_extractor <- Slicer$new(network, loss = loss, ...)
+             feature_extractor <- Slicer$new(network, loss = loss, weight = 0.01)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
              feature_extractor$encode
            },
            slicer = {
-             feature_extractor <- Slicer$new(network, loss = loss, ...)
+             feature_extractor <- Slicer$new(network, loss = loss, weight = 1)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
              feature_extractor$encode
            },
            combined = {
-             feature_extractor <- combinedae(network, loss = loss, ...) %>%
-               train.combined(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
-             partial(encode, learner = feature_extractor, .lazy = FALSE)
+             feature_extractor <- Combined$new(network, loss = loss, slicer_weight = 1, scorer_weight = 0.01)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             feature_extractor$encode
            })
 
   compose(name, expand_dims, reduction_f)
