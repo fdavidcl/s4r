@@ -5,15 +5,31 @@ Scorer <- R6::R6Class("Scorer",
     to_keras = function(input_shape) {
       learner <- ruta::autoencoder(private$network, private$reconstruction_loss)
       learner$input_shape <- input_shape
-      models <- ruta:::to_keras.ruta_autoencoder(learner)
+      models <- ruta:::to_keras(learner)
 
       # Class input accepts ones and zeros
       class_pos <- keras::layer_input(list(1))
+      models$autoencoder <- keras::keras_model(
+        list(models$autoencoder$input, class_pos),
+        list(models$autoencoder$output)
+      )
+
+      private$autoencoder <- models$autoencoder
+      private$encoder <- models$encoder
+      private$decoder <- models$decoder
 
       # Compute the loss
-      enc_input <- models$autoencoder$inputs[[1]]
-      encoding <- keras::get_layer(models$autoencoder, "encoding") %>% keras::get_output_at(1)
-      decodification <- models$autoencoder$output
+      start <- models$autoencoder$inputs[[1]]
+      end <- models$autoencoder$output
+      rec_loss <- (ruta:::to_keras(learner$loss, learner))(start, end)
+      private$loss <- keras::k_mean(rec_loss) + self$penalty()
+    }
+  ),
+  public = list(
+    penalty = function(input_shape) {
+      # Compute the loss
+      class_pos <- private$autoencoder$inputs[[2]]
+      encoding <- keras::get_layer(private$autoencoder, "encoding") %>% keras::get_output_at(1)
 
       # calculate negative instances
       class_neg <- 1 - class_pos
@@ -39,23 +55,8 @@ Scorer <- R6::R6Class("Scorer",
 
       # Normalization as seen in https://github.com/lpfgarcia/ECoL/. Now complexity is reduced when the metric is reduced
       fisher_loss_normalized <- 1 / (fisher_gain + 1)
-      # fisher_gain_normalized <- keras::k_tanh(fisher_gain)
 
-      rec_loss <- (learner$loss %>% ruta:::to_keras(learner))(enc_input, decodification)
-      regularized_loss <- (rec_loss %>% keras::k_mean()) + private$weight * fisher_loss_normalized
-      # regularized_loss <- (rec_loss %>% keras::k_mean()) - fisher_gain_normalized
-
-      models$autoencoder <- keras::keras_model(
-        list(models$autoencoder$input, class_pos),
-        list(models$autoencoder$output)
-      )
-
-      private$autoencoder <- models$autoencoder
-      private$encoder <- models$encoder
-      private$decoder <- models$decoder
-      private$loss <- regularized_loss
+      private$weight * fisher_loss_normalized
     }
-  ),
-  public = list(
   )
 )

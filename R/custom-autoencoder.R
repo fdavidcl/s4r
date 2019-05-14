@@ -15,6 +15,10 @@ CustomAutoencoder <- R6::R6Class("CustomAutoencoder",
       private$weight <- weight
     },
 
+    set_autoencoder = function(autoencoder) {
+      private$autoencoder <- autoencoder
+    },
+
     train = function(data, classes, epochs = 100, optimizer = keras::optimizer_rmsprop(), ...) {
       input_shape <- dim(data)[-1]
       private$to_keras(input_shape)
