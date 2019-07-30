@@ -5,9 +5,10 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
   ten_percent <- ceiling(0.1 * ncol(train_x))
   # At least 2 generated features
   hidden_dim <- max(min(max_for_10ppd, ten_percent), 2)
+  hidden_dim <- max(ceiling(sqrt(ncol(train_x))), 2)
 
   activation <- if (normalized) "sigmoid" else "linear"
-  network <- input() + dense(hidden_dim, "selu") + output(activation)
+  network <- input() + dense(hidden_dim, "relu") + output(activation)
 
   # Do not use binary crossentropy (and sigmoid activation) *unless* the data has been
   # accordingly normalized (to the [0, 1] interval)
@@ -30,7 +31,7 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              partial(encode, learner = feature_extractor, .lazy = FALSE)
            },
            scorer = {
-             feature_extractor <- Slicer$new(network, loss = loss, weight = 0.01)
+             feature_extractor <- Scorer$new(network, loss = loss, weight = 0.01)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
              feature_extractor$encode
            },
@@ -56,52 +57,96 @@ train_classifier <- function(train_x, train_y, classifier) {
   function(dat) predict(classifier, dat)
 }
 
-experiment_validation <- function(dataset, method, classifiers = c("knn", "svmRadial", "mlp"), seed = 4242, folds = 5, verbose = TRUE, ...) {
+#' @importFrom caret createFolds
+#' @export
+experiment_validation <- function(dataset, method, name, classifiers = c("knn", "svmRadial", "mlp"), seed = 4242, folds = 5, verbose = TRUE, autosave = TRUE, loadsave = TRUE, ...) {
+  log <- function(...) {
+    if (verbose) cat(...)
+  }
+
   set.seed(seed)
 
-  if (verbose) cat("Testing method", method, "now\n")
+  log("Testing method", method, "now\n")
 
-  train_idx <- createFolds(dataset$y, k = folds)
+  folds_idx <- createFolds(dataset$y, k = folds)
 
   results <- list()
   results$features <- list()
   cls <- list()
 
   for (i in 1:folds) {
-    train_x <- dataset$x[-train_idx[[i]],]
-    train_y <- dataset$y[-train_idx[[i]]]
-    test_x <- dataset$x[train_idx[[i]],]
-    test_y <- dataset$y[train_idx[[i]]]
+    train_x <- dataset$x[-folds_idx[[i]],]
+    train_y <- dataset$y[-folds_idx[[i]]]
+    test_x <- dataset$x[folds_idx[[i]],]
+    test_y <- dataset$y[folds_idx[[i]]]
 
-    if (verbose) cat("Entered fold", i, paste0("(", sum(test_y == 1), "/", length(test_y), " positives)"), ">> ")
+    log("Entered fold", i, paste0("(", sum(test_y == 1), "/", length(test_y), " positives)"), ">> ")
 
-    if (dataset$normalize) {
-      if (verbose) cat("normalizing >> ")
-      mx <- apply(train_x, 2, max)
-      mn <- apply(train_x, 2, min)
-      # Avoid division by zero
-      range_n <- max(mx - mn, keras::k_epsilon())
+    dirname <- file.path("checkpoints", method)
+    filename <- file.path(dirname, paste0(name, "_fold_", i, ".rds"))
+    evalname <- file.path(dirname, paste0(name, "_eval_", i, ".rds"))
+    evaluate <- T
 
-      train_x <- t(apply(train_x, 1, function(x) (x - mn) / range_n))
-      test_x <- t(apply(test_x, 1, function(x) (x - mn) / range_n))
+    if (loadsave && dir.exists(dirname) && file.exists(filename)) {
+      if (file.exists(evalname)) {
+        current <- readRDS(evalname)
+        results$features[[i]] <- current$features
+        cls[[i]] <- current$classifiers
+        evaluate <- F
+      } else {
+        reduced <- readRDS(filename)
+      }
+    } else {
+      if (dataset$normalize) {
+        if (verbose) cat("normalizing >> ")
+        mx <- apply(train_x, 2, max)
+        mn <- apply(train_x, 2, min)
+        # Avoid division by zero
+        range_n <- max(mx - mn, keras::k_epsilon())
+
+        train_x <- t(apply(train_x, 1, function(x) (x - mn) / range_n))
+        test_x <- t(apply(test_x, 1, function(x) (x - mn) / range_n))
+      }
+
+      reduction <- train_reduction(train_x, train_y, method, dataset$normalize, ...)
+
+      reduced <- list(
+        train = reduction(train_x),
+        test = reduction(test_x)
+      )
+
+      if (autosave) {
+        dir.create(dirname, showWarnings = FALSE, recursive = TRUE)
+        saveRDS(reduced, file = filename)
+      }
     }
 
-    reduction <- train_reduction(train_x, train_y, method, dataset$normalize, ...)
+    if (evaluate) {
+      log("evaluating: ")
+      results$features[[i]] <- evaluate_features(reduced$test, test_y)
+      cls[[i]] <- map(classifiers, function(cl) {
+        log(cl, "(training)")
+        model <- safely(train_classifier)(reduced$train, train_y, cl)
+        if (is.null(model$result)) {
+          return(NULL)
+        } else {
+          log(" (predicting) ")
+          predictions <- safely(model$result)(reduced$test)
+          if (!is.null(predictions$result)) {
+            res <- safely(evaluate_model)(test_y, predictions$result)
+            return(res$result)
+          } else {
+            return(NULL)
+          }
+        }
+      })
+      names(cls[[i]]) <- classifiers
 
-    reduced_train <- reduction(train_x)
-    reduced_test <- reduction(test_x)
-
-    if (verbose) cat("evaluating: ")
-    results$features[[i]] <- evaluate_features(reduced_test, test_y)
-    cls[[i]] <- map(classifiers, function(cl) {
-      cat(cl, "(training)")
-      model <- train_classifier(reduced_train, train_y, cl)
-      cat(" (predicting) ")
-      predictions <- model(reduced_test)
-      evaluate_model(test_y, predictions)
-    })
-    names(cls[[i]]) <- classifiers
-    cat("\n")
+      if (autosave) {
+        saveRDS(list(features = results$features[[i]], classifiers = cls[[i]]), file = evalname)
+      }
+    }
+    log("\n")
   }
 
   results$classifiers <- map(classifiers, function(cl) {
@@ -114,6 +159,7 @@ experiment_validation <- function(dataset, method, classifiers = c("knn", "svmRa
   structure(results, class = results_dataset)
 }
 
+#' @export
 experiment_all <-
   function(datasets = dataset_list(),
            folder = paste0("results_", format(Sys.time(), "%y-%m-%d_%H:%M")),
@@ -124,7 +170,12 @@ experiment_all <-
                        "slicer",
                        "combined"),
            verbose = T,
+           autosave = T,
+           loadsave = T,
            ...) {
+  log <- function(...) {
+    if (verbose) cat(...)
+  }
 
   options(keras.fit_verbose = 0)
 
@@ -132,28 +183,32 @@ experiment_all <-
 
   results <- map2(datasets, names(datasets), function(dataset_f, name) {
     save_name <- file.path(folder, paste0(name, ".rds"))
-    if (file.exists(save_name)) {
-      if (verbose) cat("Skipping", name, "\n")
+    if (loadsave && file.exists(save_name)) {
+      log("Skipping", name, "\n")
       readRDS(save_name)
     } else {
       keras::backend()$clear_session()
       gc()
-      if (verbose) cat("Now reading", name, ">> ")
+      log("Now reading", name, ">> ")
       dataset <- dataset_f()
-      if (verbose) cat("OK. Testing methods...\n")
+      log("OK. Testing methods...\n")
 
-      this_dataset <- map(methods, function(m) experiment_validation(dataset = dataset, method = m, ...))
+      this_dataset <- map(methods, function(m)
+        experiment_validation(dataset = dataset, method = m, verbose = verbose, name = name, autosave = autosave, loadsave = loadsave, ...))
       names(this_dataset) <- methods
 
-      if (verbose) cat("All tests ok. Saving...\n")
-      saveRDS(this_dataset, file = save_name)
+      log("All tests ok. Saving...\n")
+      if (autosave) {
+        saveRDS(this_dataset, file = save_name)
+      }
 
       this_dataset
     }
   })
 
-  saveRDS(results, file = file.path(folder, "results.rds"))
+  results <- structure(results, class = results_experiment)
 
-  invisible(structure(results, class = results_experiment))
+  saveRDS(results, file = file.path(folder, "results.rds"))
+  invisible(results)
 }
 

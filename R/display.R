@@ -11,7 +11,7 @@ print.list_metrics <- function(x, ...) {
 
 printable.results_dataset <- function(x, ...) {
   average <- function(obj) {
-    map(obj, printable) %>% do.call(rbind, .) %>% colMeans
+    map(obj, printable) %>% do.call(rbind, .) %>% colMeans(na.rm = TRUE)
   }
   printable_features <- average(x$features)
   printable_cls <- map(x$classifiers, average)
@@ -116,9 +116,9 @@ get_tests <- function(tables, quiet = T, control = "slicer", exclude = character
   )
 
   higher_is_better <- list(
-    fisher = TRUE,
-    volume = TRUE,
-    efficiency = TRUE,
+    fisher = F,
+    volume = F,
+    efficiency = F,
     errorknn = FALSE,
     errorlin = FALSE,
     nonlin = FALSE,

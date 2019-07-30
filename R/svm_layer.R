@@ -30,6 +30,7 @@ SVMLayer <- R6::R6Class("R6Layer",
   )
 )
 
+
 layer_svm <- function(object, name = NULL, trainable = TRUE) {
   keras::create_layer(SVMLayer, object, list(
     name = name,

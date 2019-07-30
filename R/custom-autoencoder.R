@@ -1,3 +1,29 @@
+#' CustomAutoencoder
+#'
+#' A common abstract class for custom autoencoder implementations.
+#'
+#' @section Arguments:
+#'
+#'   `network` Ruta network object indicating the desired architecture.
+#'
+#'   `loss` Character scalar (e.g. `"mean_squared_error"`) or Ruta loss object.
+#'
+#'   `weight` Weight of the applied penalty.
+#'
+#' @section Methods:
+#'
+#'   `$new()` Initialize new object
+#'
+#'   `$set_autoencoder()` Save a Keras model as internal autoencoder.
+#'
+#'   `$train()` Train the autoencoder with data.
+#'
+#'   `$encode()` Once trained, encode new data.
+#'
+#' @name CustomAutoencoder
+NULL
+
+#' @export
 CustomAutoencoder <- R6::R6Class("CustomAutoencoder",
   private = list(
     network = NULL,

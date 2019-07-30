@@ -28,7 +28,7 @@ NULL
 
 #' @include custom-autoencoder.R
 #' @export
-Scorer <- R6::R6Class("Scorer",
+Skaler <- R6::R6Class("Scorer",
   inherit = CustomAutoencoder,
   private = list(
     to_keras = function(input_shape) {
@@ -75,17 +75,14 @@ Scorer <- R6::R6Class("Scorer",
       mean_pos <- keras::k_sum(encoding_if_pos, axis = 1) / amount_pos
       mean_neg <- keras::k_sum(encoding_if_neg, axis = 1) / amount_neg
 
-      # similarly calculate variance as E[X^2] - E[X]^2
-      variance_pos <- keras::k_sum(keras::k_square(encoding_if_pos), axis = 1) / amount_pos - keras::k_square(mean_pos)
-      variance_neg <- keras::k_sum(keras::k_square(encoding_if_neg), axis = 1) / amount_neg - keras::k_square(mean_neg)
+      kullback <- mean_pos * (keras::k_log(mean_pos) - keras::k_log(mean_neg)) +
+        (1 - mean_pos) * (keras::k_log(1 - mean_pos) - keras::k_log(1 - mean_neg))
 
-      fisher_ratios <- keras::k_square(mean_pos - mean_neg) * (1 / (variance_pos + variance_neg + keras::k_epsilon()))
-      fisher_gain <- keras::k_mean(fisher_ratios)
+      leibler <- keras::k_sum(kullback) / encoding$shape[2] + keras::k_epsilon()
 
-      # Normalization as seen in https://github.com/lpfgarcia/ECoL/. Now complexity is reduced when the metric is reduced
-      fisher_loss_normalized <- 1 / (fisher_gain + 1)
+      penalty <- keras::k_tanh(1 / leibler)
 
-      private$weight * fisher_loss_normalized
+      private$weight * penalty
     }
   )
 )

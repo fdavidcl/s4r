@@ -10,22 +10,19 @@ Description: Implementations of custom autoencoders based on the Ruta package:
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: ruta, keras, purrr, scmamp, dcme
+Imports: ruta, keras, purrr, scmamp, dcme, cccd, caret
+Roxygen: list(markdown = TRUE)
 RoxygenNote: 6.1.1
 Collate: 
-    '00oldfunctions.R'
     '01classes.R'
-    '_combined.R'
-    '_l2-svm-ae.R'
-    '_supercore.R'
     'svm_layer.R'
     'custom-autoencoder.R'
     'slicer.R'
+    'skaler.R'
     'combined.R'
     'data_management.R'
     'display.R'
     'evaluation.R'
     'experiment.R'
-    'hello.R'
     'scorer.R'
     'utils.R'

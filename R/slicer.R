@@ -1,5 +1,35 @@
+#' Slicer
+#'
+#' Supervised linear classifier error reduction. This autoencoder uses a Support
+#' Vector Machine-based penalty in order to increase class separability.
+#'
+#' @section Arguments:
+#'
+#'   `network` Ruta network object indicating the desired architecture.
+#'
+#'   `loss` Character scalar (e.g. `"mean_squared_error"`) or Ruta loss object.
+#'
+#'   `weight` Weight of the applied penalty.
+#'
+#' @section Methods:
+#'
+#'   `$new()` Initialize new object
+#'
+#'   `$set_autoencoder()` Save a Keras model as internal autoencoder.
+#'
+#'   `$train()` Train the autoencoder with data.
+#'
+#'   `$encode()` Once trained, encode new data.
+#'
+#'   `$penalty()` Retrieve the Keras tensor which computes the penalty for the
+#'   loss.
+#'
+#' @name Slicer
+NULL
+
 #' @include custom-autoencoder.R
 #' @include svm_layer.R
+#' @export
 Slicer <- R6::R6Class("Slicer",
   inherit = CustomAutoencoder,
   private = list(
@@ -9,7 +39,9 @@ Slicer <- R6::R6Class("Slicer",
       models <- ruta:::to_keras(learner)
 
       encoding <- keras::get_layer(models$autoencoder, "encoding") %>% keras::get_output_at(1)
+
       svmtrainer <- layer_svm(encoding, "svm_layer")
+      # svmtrainer <- keras::k_sum(encoding, name = "svm_layer")
 
       # class input accepts ones and zeros
       class_pos <- keras::layer_input(list(1))
