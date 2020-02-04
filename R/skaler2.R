@@ -27,7 +27,7 @@ NULL
 
 #' @include custom-autoencoder.R
 #' @export
-Skaler <- R6::R6Class("Skaler",
+Skaler2 <- R6::R6Class("Skaler2",
   inherit = CustomAutoencoder,
   private = list(
     to_keras = function(input_shape) {
@@ -78,18 +78,16 @@ Skaler <- R6::R6Class("Skaler",
       # KLD is asymmetric, compute both KLD and sum?
       # would it be better to use mutual information?
 
-      # kullback <- mean_pos * (keras::k_log(mean_pos) - keras::k_log(mean_neg)) +
-      #   (1 - mean_pos) * (keras::k_log(1 - mean_pos) - keras::k_log(1 - mean_neg))
+      p_pos <- keras::k_expand_dims(keras::k_softmax(mean_pos))
+      p_neg <- keras::k_expand_dims(keras::k_softmax(mean_neg), 1L)
 
-      # leibler <- keras::k_sum(kullback) / encoding$shape[2] + keras::k_epsilon()
+      p <- keras::k_dot(p_pos, p_neg)
+      side <- keras::k_int_shape(p)[[1]]
+      diag_almost_1 <- keras::k_eye(side) * (1 - (side - 1) * keras::k_epsilon()) # force sum 1 in identity
+      complem_eps <- (1 - keras::k_eye(side)) * keras::k_epsilon()
+      id <- diag_almost_1 + complem_eps
 
-      # penalty <- keras::k_tanh(1 / leibler)
-
-      p_pos <- keras::k_softmax(mean_pos)
-      p_neg <- keras::k_softmax(mean_neg)
-
-      kld <- keras::k_sum(p_pos * keras::k_log(p_pos/p_neg))
-      # probar también a usar p_neg
+      kld <- keras::k_sum(p * keras::k_log(p / id))
 
       private$weight * (- kld)
     }

@@ -7,3 +7,6 @@ results_dataset <- "results_dataset"
 
 # results_experiment: { dataset = { method = results_dataset } }
 results_experiment <- "results_experiment"
+
+CLASSIFIERS <- c("knn", "svmRadial", "mlp")
+CL_METRICS  <- c("fscore", "auc", "kappa")

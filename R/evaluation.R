@@ -31,13 +31,14 @@ digraph_measures <- function(features, classes) {
 evaluate_features <- function(features, classes) {
   #return(structure(list(), class = list_metrics))
   df <- as.data.frame(features)
+  default <- list(c(mean = NA_real_, sd = NA_real_))
   structure(c(list(
-    fisher =     safely(ECoL::overlapping, otherwise = NA_real_)(x = df, y = classes, measures = "F1")$result, #dcme::F1(features, classes)
-    volume =     safely(ECoL::overlapping, otherwise = NA_real_)(x = df, y = classes, measures = "F2")$result, #dcme::F2(features, classes),
-    efficiency = safely(ECoL::overlapping, otherwise = NA_real_)(x = df, y = classes, measures = "F3")$result,
-    errorknn =   safely(ECoL::neighborhood, otherwise = NA_real_)(x = df, y = classes, measures = "N3")$result,
-    errorlin =   safely(ECoL::linearity.class, otherwise = NA_real_)(x = df, y = classes, measures = "L2")$result,
-    nonlin =     safely(ECoL::linearity.class, otherwise = NA_real_)(x = as.data.frame(features), y = classes, measures = "L3")$result
+    fisher =     safely(ECoL::overlapping,  otherwise = default)(x = df, y = classes, measures = "F1")$result[[1]]["mean"], #dcme::F1(features, classes)
+    volume =     safely(ECoL::overlapping,  otherwise = default)(x = df, y = classes, measures = "F2")$result[[1]]["mean"], #dcme::F2(features, classes),
+    efficiency = safely(ECoL::overlapping,  otherwise = default)(x = df, y = classes, measures = "F3")$result[[1]]["mean"],
+    errorknn =   safely(ECoL::neighborhood, otherwise = default)(x = df, y = classes, measures = "N3")$result[[1]]["mean"],
+    errorlin =   safely(ECoL::linearity,    otherwise = default)(x = df, y = classes, measures = "L2")$result[[1]]["mean"],
+    nonlin =     safely(ECoL::linearity,    otherwise = default)(x = df, y = classes, measures = "L3")$result[[1]]["mean"]
     # ir = dcme::IR(classes),
     # ppd = dcme::T2(features)
   ),
@@ -122,9 +123,9 @@ eval_lists <- function(folder = "checkpoints", method = "slicer", eval = "kappa"
   classifier_metrics
 }
 
-evaluate_correlations_from_files <- function(folder = "checkpoints", method = "slicer", metric = "onb_total") {
+evaluate_correlations_from_files <- function(folder = "checkpoints", method = "slicer", metric = "onb_total", evalmetric = "kappa") {
   basemetrics <- metric_list(folder = folder, metric = metric) # numeric vector
-  evalmetrics <- eval_lists(folder = folder, method = method) # list of numeric vectors
+  evalmetrics <- eval_lists(folder = folder, method = method, eval = evalmetric) # list of numeric vectors
 
   useful <-
     !(
@@ -133,5 +134,18 @@ evaluate_correlations_from_files <- function(folder = "checkpoints", method = "s
       (basemetrics %>% is.na)
     )
 
+  plot(basemetrics[useful], evalmetrics[[1]][useful], pch = 2, col = "#3070c0", xlab = "Average number of balls in cover", ylab = evalmetric)
+  points(basemetrics[useful], evalmetrics[[2]][useful], pch = 3, col = "#c09020")
+  points(basemetrics[useful], evalmetrics[[3]][useful], pch = 4, col = "#20c030")
+  legend("bottomleft", legend = names(evalmetrics), pch = c(2, 3, 4), col = c("#3070c0", "#c09020", "#20c030"))
   map(evalmetrics, ~ correlations(.[useful], basemetrics[useful]))
+}
+
+evaluate_gain <- function(folder = "checkpoints", method = "slicer", evalmetric = "auc", baseline = "baseline") {
+  basemetrics <- eval_lists(folder = folder, method = baseline, eval = evalmetric) # list of numeric vectors
+  evalmetrics <- eval_lists(folder = folder, method = method, eval = evalmetric) # list of numeric vectors
+
+  gains <- (as.data.frame(evalmetrics) - as.data.frame(basemetrics))/as.data.frame(basemetrics) * 100
+  boxplot(gains)
+  summary(gains)
 }

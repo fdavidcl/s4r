@@ -1,4 +1,8 @@
 "
 Dexter (no puede entrenar kNN con baseline)
+HAR (da error)
 IMDB (no puede entrenar SVM a veces)
+Internet::lle::evaluating realloc(): invalid old size 
+Skaler2::Arcene (da todo 0)
+Arcene hasta HillValley
 "

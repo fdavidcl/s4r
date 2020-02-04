@@ -2,3 +2,17 @@
 .Rhistory
 .RData
 .Ruserdata
+data/*.csv
+data/*.names
+data/*.arff
+data/*.dat
+data/*.data
+data/*.labels
+data/*.trn
+data/*.test
+*.rds
+*.Rds
+data.old/
+experiment*/
+checkpoi*/
+*.old

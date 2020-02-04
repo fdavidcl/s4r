@@ -1,18 +1,32 @@
 #' @importFrom ruta input dense output train autoencoder encode
 #' @importFrom purrr partial compose %>%
+#' @importFrom dimRed LLE Isomap embed
+#' @importFrom caret knn3
 train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
+  args <- list(...)
   max_for_10ppd <- ceiling(0.1 * nrow(train_x))
   ten_percent <- ceiling(0.1 * ncol(train_x))
+  squareroot <- ceiling(sqrt(ncol(train_x)))
   # At least 2 generated features
-  hidden_dim <- max(min(max_for_10ppd, ten_percent), 2)
-  hidden_dim <- max(ceiling(sqrt(ncol(train_x))), 2)
+  # hidden_dim <- max(min(max_for_10ppd, ten_percent), 2)
+  hidden_dim <- max(min(max_for_10ppd, squareroot), 2)
+  # hidden_dim <- max(sqrt(ncol(train_x)), 2)
 
   activation <- if (normalized) "sigmoid" else "linear"
-  network <- input() + dense(hidden_dim, "relu") + output(activation)
+
+  network <- if (squareroot <= max_for_10ppd && squareroot <= 10) {
+    input() + dense(hidden_dim, "relu") + output(activation)
+  } else {
+    middle <- floor(sqrt(ncol(train_x) * hidden_dim))
+    input() + dense(middle, "relu") + dense(hidden_dim, "relu") + dense(middle, "relu") + output(activation)
+  }
+
+
 
   # Do not use binary crossentropy (and sigmoid activation) *unless* the data has been
   # accordingly normalized (to the [0, 1] interval)
   loss <- if (normalized) "binary_crossentropy" else "mean_squared_error"
+  epochs <- if (is.null(args$epochs)) 200 else args$epochs
 
   # reduction_f <- function(x) x
   reduction_f <-
@@ -25,128 +39,185 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              pca <- train_x %>% prcomp(scale = FALSE, center = FALSE)
              function(x) predict(pca, x)[, 1:hidden_dim]
            },
+           isomap = {
+             embedding <- embed(train_x, "Isomap", .mute = c("message", "output"), ndim = hidden_dim)
+             function(x) {
+               if (nrow(x) == nrow(train_x) && all(x == train_x)) embedding@data@data
+               else embedding@apply(x)@data
+             }
+           },
+           lle = {
+             function(x) {
+               # learns embedding with train and test dataset, apparently
+               # the only way to do it with LLE, but valid because the class
+               # info is not used
+               embedding <- embed(rbind(x, train_x), "LLE", .mute = c("message", "output"), ndim = hidden_dim)
+               embedding@data@data[1:nrow(x), ]
+             }
+           },
            autoencoder = {
              feature_extractor <- autoencoder(network, loss = loss, ...) %>%
                train(train_x, epochs = 200)
              partial(encode, learner = feature_extractor, .lazy = FALSE)
            },
            scorer = {
-             feature_extractor <- Scorer$new(network, loss = loss, weight = 0.01)
-             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             weight <- if (is.null(args$weight)) 0.01 else args$weight
+             feature_extractor <- Scorer$new(network, loss = loss, weight = weight)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            slicer = {
-             feature_extractor <- Slicer$new(network, loss = loss, weight = 1)
-             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             weight <- if (is.null(args$weight)) 1 else args$weight
+             feature_extractor <- Slicer$new(network, loss = loss, weight = weight)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
+             feature_extractor$encode
+           },
+           skaler = {
+             network2 <- network
+             network2[[2]]$activation <- "sigmoid"
+             weight <- if (is.null(args$weight)) 1 else args$weight
+             feature_extractor <- Skaler$new(network2, loss = loss, weight = weight)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
+             feature_extractor$encode
+           },
+           skaler3 = {
+             # network2 <- network
+             # network2[[2]]$activation <- "sigmoid"
+             weight <- if (is.null(args$weight)) 1e-6 else args$weight
+             feature_extractor <- Skaler$new(network, loss = loss, weight = weight)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
+             feature_extractor$encode
+           },
+           skaler2 = {
+            #  network2 <- network
+            #  network2[[2]]$activation <- "sigmoid"
+             weight <- if (is.null(args$weight)) 1 else args$weight
+             feature_extractor <- Skaler2$new(network, loss = loss, weight = weight)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            combined = {
              feature_extractor <- Combined$new(network, loss = loss, slicer_weight = 1, scorer_weight = 0.01)
-             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = 200)
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            })
 
   compose(name, expand_dims, reduction_f)
 }
 
-#' @importFrom caret trainControl train
+#' @import caret
 #' @importFrom purrr partial
 train_classifier <- function(train_x, train_y, classifier) {
   ctrl <- trainControl(method = "none")
-  classifier <- caret::train(train_x, train_y, method = classifier, trControl = ctrl)
-  function(dat) predict(classifier, dat)
+  pars <- list(
+    train_x,
+    train_y,
+    method = classifier,
+    trControl = ctrl
+  )
+  if (classifier == "knn") {
+    pars["use.all"] <- FALSE
+  }
+
+  classifier <- tryCatch(
+    do.call(caret::train, pars),
+    error = function(e) NULL
+  )
+  # if predicting fails, predict the same class for all rows
+  function(dat) tryCatch(
+    predict(classifier, dat),
+    error = function(e) rep(train_y[1], nrow(dat))
+  )
 }
 
 #' @importFrom caret createFolds
 #' @export
-experiment_validation <- function(dataset, method, name, classifiers = c("knn", "svmRadial", "mlp"), seed = 4242, folds = 5, verbose = TRUE, autosave = TRUE, loadsave = TRUE, ...) {
+experiment_validation <- function(
+  dataset_f, method, name, classifiers = c("knn", "svmRadial", "mlp"),
+  seed = 4242, folds = 5, verbose = TRUE, autosave = TRUE, loadsave = TRUE,
+  # The following parameters take advantage of R's lazy parameter evaluation in order
+  # to skip dataset loading unless it is needed
+  dataset = dataset_f(), folds_idx = set_folds(), ...) {
   log <- function(...) {
     if (verbose) cat(...)
   }
 
-  set.seed(seed)
+  log("Method:", method, "|| ")
 
-  log("Testing method", method, "now\n")
-
-  folds_idx <- createFolds(dataset$y, k = folds)
+  # Lazy computation of dataset folds
+  set_folds <- function() {
+    set.seed(seed)
+    createFolds(dataset$y, k = folds)
+  }
 
   results <- list()
   results$features <- list()
   cls <- list()
 
   for (i in 1:folds) {
-    train_x <- dataset$x[-folds_idx[[i]],]
-    train_y <- dataset$y[-folds_idx[[i]]]
-    test_x <- dataset$x[folds_idx[[i]],]
-    test_y <- dataset$y[folds_idx[[i]]]
-
-    log("Entered fold", i, paste0("(", sum(test_y == 1), "/", length(test_y), " positives)"), ">> ")
-
     dirname <- file.path("checkpoints", method)
     filename <- file.path(dirname, paste0(name, "_fold_", i, ".rds"))
     evalname <- file.path(dirname, paste0(name, "_eval_", i, ".rds"))
-    evaluate <- T
 
-    if (loadsave && dir.exists(dirname) && file.exists(filename)) {
-      if (file.exists(evalname)) {
-        current <- readRDS(evalname)
-        results$features[[i]] <- current$features
-        cls[[i]] <- current$classifiers
-        evaluate <- F
-      } else {
+    # all work is done
+    if (loadsave && dir.exists(dirname) && file.exists(filename) && file.exists(evalname)) {
+      current <- readRDS(evalname)
+      results$features[[i]] <- current$features
+      cls[[i]] <- current$classifiers
+    } else { # need to train and/or evaluate, so load datasets
+      train_x = dataset$x[-folds_idx[[i]],]
+      train_y = dataset$y[-folds_idx[[i]]]
+      test_x = dataset$x[folds_idx[[i]],]
+      test_y = dataset$y[folds_idx[[i]]]
+
+      if (loadsave && dir.exists(dirname) && file.exists(filename)) {
         reduced <- readRDS(filename)
+      } else {
+        log("Fold", i, paste0("(", sum(test_y == 1), "/", length(test_y), " positives)"), ">> ")
+
+        if (dataset$normalize) {
+          log("normalizing")
+          mx <- apply(train_x, 2, max)
+          mn <- apply(train_x, 2, min)
+          # Avoid division by zero
+          range_n <- max(mx - mn, keras::k_epsilon())
+
+          train_x <- t(apply(train_x, 1, function(x) (x - mn) / range_n))
+          test_x <- t(apply(test_x, 1, function(x) (x - mn) / range_n))
+          log(" >> ")
+        }
+
+        reduction <- purrr::quietly(train_reduction)(train_x, train_y, method, dataset$normalize, ...)$result
+
+        reduced <- list(
+          train = purrr::quietly(reduction)(train_x)$result,
+          test = purrr::quietly(reduction)(test_x)$result
+        )
+
+        if (autosave) {
+          dir.create(dirname, showWarnings = FALSE, recursive = TRUE)
+          saveRDS(reduced, file = filename)
+        }
       }
-    } else {
-      if (dataset$normalize) {
-        if (verbose) cat("normalizing >> ")
-        mx <- apply(train_x, 2, max)
-        mn <- apply(train_x, 2, min)
-        # Avoid division by zero
-        range_n <- max(mx - mn, keras::k_epsilon())
 
-        train_x <- t(apply(train_x, 1, function(x) (x - mn) / range_n))
-        test_x <- t(apply(test_x, 1, function(x) (x - mn) / range_n))
-      }
-
-      reduction <- train_reduction(train_x, train_y, method, dataset$normalize, ...)
-
-      reduced <- list(
-        train = reduction(train_x),
-        test = reduction(test_x)
-      )
-
-      if (autosave) {
-        dir.create(dirname, showWarnings = FALSE, recursive = TRUE)
-        saveRDS(reduced, file = filename)
-      }
-    }
-
-    if (evaluate) {
       log("evaluating: ")
       results$features[[i]] <- evaluate_features(reduced$test, test_y)
       cls[[i]] <- map(classifiers, function(cl) {
         log(cl, "(training)")
-        model <- safely(train_classifier)(reduced$train, train_y, cl)
-        if (is.null(model$result)) {
-          return(NULL)
-        } else {
-          log(" (predicting) ")
-          predictions <- safely(model$result)(reduced$test)
-          if (!is.null(predictions$result)) {
-            res <- safely(evaluate_model)(test_y, predictions$result)
-            return(res$result)
-          } else {
-            return(NULL)
-          }
-        }
+        model <- purrr::quietly(train_classifier)(reduced$train, train_y, cl)$result
+        log(" (predicting) ")
+        predictions <- model(reduced$test)
+        purrr::quietly(evaluate_model)(test_y, predictions)$result
       })
       names(cls[[i]]) <- classifiers
 
       if (autosave) {
         saveRDS(list(features = results$features[[i]], classifiers = cls[[i]]), file = evalname)
       }
+      log("\n")
     }
-    log("\n")
+
+    gc()
   }
 
   results$classifiers <- map(classifiers, function(cl) {
@@ -154,10 +225,51 @@ experiment_validation <- function(dataset, method, name, classifiers = c("knn", 
   })
   names(results$classifiers) <- classifiers
 
-  if (verbose) cat("Test ok.\n")
+  log("OK\n")
 
   structure(results, class = results_dataset)
 }
+
+weight_optimization <- function(datasets = dataset_list(except = c("IMDB", "Internet", "Riccardo")),
+                                method = "skaler",
+                                weights = 10 ** seq(-4, 2, by = 1),
+                                metric = "knn.fscore",
+                                epochs = 20) {
+
+  results <- array(dim = c(length(datasets), length(weights)))
+  dimnames(results) <- list(names(datasets), as.character(weights))
+  is_classifier_metric <- grepl(".", metric, fixed=T)
+
+  classifier <- if (is_classifier_metric) strsplit(metric, ".", fixed=T)[[1]][1] else character(0)
+  metric <- if (is_classifier_metric) strsplit(metric, ".", fixed=T)[[1]][2] else metric
+
+  for (d in names(datasets)) {
+    for (w in weights) {
+      partial <-
+        experiment_validation(
+          datasets[[d]],
+          method = method,
+          name = d,
+          classifiers = classifier,
+          autosave = F,
+          loadsave = F,
+          weight = w,
+          epochs = epochs
+        )
+      results[d, w] <-
+        if (is_classifier_metric) {
+          print(partial$classifiers[[classifier]][[metric]])
+          partial$classifiers[[classifier]][[metric]] %>% unlist() %>% mean(na.rm = T)
+        } else {
+          print(partial$features)
+          partial$features %>% map( ~ .[metric]) %>% unlist() %>% mean(na.rm = T)
+        }
+    }
+  }
+
+  results
+}
+
 
 #' @export
 experiment_all <-
@@ -165,9 +277,13 @@ experiment_all <-
            folder = paste0("results_", format(Sys.time(), "%y-%m-%d_%H:%M")),
            methods = c("baseline",
                        "pca",
+                       "lle",
+                       "isomap",
                        "autoencoder",
                        "scorer",
                        "slicer",
+                       "skaler",
+                       "skaler3",
                        "combined"),
            verbose = T,
            autosave = T,
@@ -178,6 +294,9 @@ experiment_all <-
   }
 
   options(keras.fit_verbose = 0)
+  #library(tensorflow)
+  gpu <- tensorflow::tf$config$experimental$get_visible_devices('GPU')[[1]]
+  tensorflow::tf$config$experimental$set_memory_growth(device = gpu, enable = TRUE)
 
   dir.create(folder, recursive = TRUE)
 
@@ -187,14 +306,33 @@ experiment_all <-
       log("Skipping", name, "\n")
       readRDS(save_name)
     } else {
-      keras::backend()$clear_session()
+      # keras::backend()$clear_session()
+      # config = tensorflow::tf_config()
+      # keras::backend()$set_session()
       gc()
-      log("Now reading", name, ">> ")
-      dataset <- dataset_f()
-      log("OK. Testing methods...\n")
 
-      this_dataset <- map(methods, function(m)
-        experiment_validation(dataset = dataset, method = m, verbose = verbose, name = name, autosave = autosave, loadsave = loadsave, ...))
+      log("Entering", name, ">> ")
+      dataset_f2 <- function() {
+        ds <- dataset_f()
+        log("read dataset >> ")
+        ds
+      }
+
+      this_dataset <- map(methods, function(m) {
+        save_partial <- file.path(folder, paste0(name, "_", m, ".rds"))
+        system2("/usr/bin/env", c("Rscript", "R/validation_proc.R",
+                name, m, as.character(verbose), as.character(autosave), as.character(loadsave), save_partial))
+        readRDS(save_partial)
+      })
+        # experiment_validation(
+        #   dataset_f = dataset_f2,
+        #   method = m,
+        #   verbose = verbose,
+        #   name = name,
+        #   autosave = autosave,
+        #   loadsave = loadsave,
+        #   ...
+        # ))
       names(this_dataset) <- methods
 
       log("All tests ok. Saving...\n")
@@ -212,3 +350,5 @@ experiment_all <-
   invisible(results)
 }
 
+
+# experiment_all(dataset_list(except=c("Arcene","IMDB")), methods=c("pca","isomap","autoencoder","scorer","skaler2","skaler","slicer"))
