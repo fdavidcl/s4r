@@ -158,14 +158,31 @@ get_rankings <- function(tables, decreasing = 9:17) {
 }
 
 get_plots <- function(tables, which=c("fisher", "efficiency", "knn.fscore", "knn.kappa")) {
-  pars <- list(nrow = floor(length(which)/2))
-  if (length(which) == 4) {
-    pars[["layout_matrix"]] <- matrix(c(1,1,1,2,2,2,2,2,3,3,3,4,4,4,4,4),nrow=2,byrow=T)
-  }
+  # pars <- list(nrow = floor(length(which)/2))
+  # if (length(which) == 4) {
+  #   pars[["layout_matrix"]] <- matrix(c(1,1,1,2,2,2,2,2,3,3,3,4,4,4,4,4),nrow=2,byrow=T)
+  # }
+  #
+  # plots <- map2(which, rep(c(FALSE, TRUE), length.out=length(which)),
+  #   ~ scmamp::plotDensities(tables[.x, , ], na.rm = TRUE, show.legend = .y) + ggplot2::xlab(.x))
+  # do.call(gridExtra::grid.arrange, c(plots, pars))
 
-  plots <- map2(which, rep(c(FALSE, TRUE), length.out=length(which)),
-    ~ scmamp::plotDensities(tables[.x, , ], na.rm = TRUE, show.legend = .y) + ggplot2::xlab(.x))
-  do.call(gridExtra::grid.arrange, c(plots, pars))
+  tables_wide <- lapply(dimnames(tables)[[1]], function(metric) {
+    # metric_results <- tables[metric, , ]
+    blocks <- lapply(dimnames(tables)[[3]], function(method) {
+      data.frame(
+        score = tables[metric, , method],
+        method = method
+      )
+    })
+
+    do.call(rbind, blocks)
+  })
+  names(tables_wide) <- dimnames(tables)[[1]]
+
+  map(which, ~ggplot2::ggplot(tables_wide[[.]], ggplot2::aes(x=score, y=method)) +
+      ggridges::geom_density_ridges(quantile_lines = TRUE, quantiles = 2))
+
 }
 
 #' @import scmamp

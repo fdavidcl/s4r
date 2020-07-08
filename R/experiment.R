@@ -14,11 +14,14 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
 
   activation <- if (normalized) "sigmoid" else "linear"
 
+  middle_layer <- 2
   network <- if (squareroot <= max_for_10ppd && squareroot <= 10) {
     input() + dense(hidden_dim, "relu") + output(activation)
   } else {
+    middle_layer <- 3
     middle <- floor(sqrt(ncol(train_x) * hidden_dim))
-    input() + dense(middle, "relu") + dense(hidden_dim, "relu") + dense(middle, "relu") + output(activation)
+    middle_act <- if (method %in% c("skaler", "skaler2")) "sigmoid" else "relu"
+    input() + dense(middle, "relu") + dense(hidden_dim, middle_act) + dense(middle, "relu") + output(activation)
   }
 
 
@@ -56,8 +59,8 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              }
            },
            autoencoder = {
-             feature_extractor <- autoencoder(network, loss = loss, ...) %>%
-               train(train_x, epochs = 200)
+             feature_extractor <- autoencoder(network, loss = loss) %>%
+               train(train_x, epochs = epochs)
              partial(encode, learner = feature_extractor, .lazy = FALSE)
            },
            scorer = {
@@ -73,25 +76,19 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              feature_extractor$encode
            },
            skaler = {
-             network2 <- network
-             network2[[2]]$activation <- "sigmoid"
-             weight <- if (is.null(args$weight)) 1 else args$weight
-             feature_extractor <- Skaler$new(network2, loss = loss, weight = weight)
+             weight <- if (is.null(args$weight)) 0.1 else args$weight
+             feature_extractor <- Skaler$new(network, loss = loss, weight = weight)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            skaler3 = {
-             # network2 <- network
-             # network2[[2]]$activation <- "sigmoid"
-             weight <- if (is.null(args$weight)) 1e-6 else args$weight
+             weight <- if (is.null(args$weight)) .1 else args$weight
              feature_extractor <- Skaler$new(network, loss = loss, weight = weight)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            skaler2 = {
-            #  network2 <- network
-            #  network2[[2]]$activation <- "sigmoid"
-             weight <- if (is.null(args$weight)) 1 else args$weight
+             weight <- if (is.null(args$weight)) .01 else args$weight
              feature_extractor <- Skaler2$new(network, loss = loss, weight = weight)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
@@ -134,7 +131,7 @@ train_classifier <- function(train_x, train_y, classifier) {
 #' @export
 experiment_validation <- function(
   dataset_f, method, name, classifiers = c("knn", "svmRadial", "mlp"),
-  seed = 4242, folds = 5, verbose = TRUE, autosave = TRUE, loadsave = TRUE,
+  seed = 4242, folds = 5, verbose = TRUE, autosave = TRUE, loadsave = TRUE, omit = FALSE,
   # The following parameters take advantage of R's lazy parameter evaluation in order
   # to skip dataset loading unless it is needed
   dataset = dataset_f(), folds_idx = set_folds(), ...) {
@@ -164,6 +161,9 @@ experiment_validation <- function(
       current <- readRDS(evalname)
       results$features[[i]] <- current$features
       cls[[i]] <- current$classifiers
+    } else if (omit) {
+      results$features[[i]] <- NA
+      cls[[i]] <- structure(map(classifiers, ~NA), names = classifiers)
     } else { # need to train and/or evaluate, so load datasets
       train_x = dataset$x[-folds_idx[[i]],]
       train_y = dataset$y[-folds_idx[[i]]]
@@ -245,17 +245,21 @@ weight_optimization <- function(datasets = dataset_list(except = c("IMDB", "Inte
 
   for (d in names(datasets)) {
     for (w in weights) {
-      partial <-
-        experiment_validation(
-          datasets[[d]],
-          method = method,
-          name = d,
-          classifiers = classifier,
-          autosave = F,
-          loadsave = F,
-          weight = w,
-          epochs = epochs
-        )
+      save_partial <- file.path(tempdir(), "partial.rds")
+      system2("/usr/bin/env", c("Rscript", "R/validation_proc.R",
+                                d, method, as.character(verbose), as.character(FALSE), as.character(FALSE), save_partial))
+      readRDS(save_partial)
+      # partial <-
+      #   experiment_validation(
+      #     datasets[[d]],
+      #     method = method,
+      #     name = d,
+      #     classifiers = classifier,
+      #     autosave = F,
+      #     loadsave = F,
+      #     weight = w,
+      #     epochs = epochs
+      #   )
       results[d, w] <-
         if (is_classifier_metric) {
           print(partial$classifiers[[classifier]][[metric]])
@@ -288,6 +292,7 @@ experiment_all <-
            verbose = T,
            autosave = T,
            loadsave = T,
+           omit = F,
            ...) {
   log <- function(...) {
     if (verbose) cat(...)
@@ -321,7 +326,7 @@ experiment_all <-
       this_dataset <- map(methods, function(m) {
         save_partial <- file.path(folder, paste0(name, "_", m, ".rds"))
         system2("/usr/bin/env", c("Rscript", "R/validation_proc.R",
-                name, m, as.character(verbose), as.character(autosave), as.character(loadsave), save_partial))
+                name, m, as.character(verbose), as.character(autosave), as.character(loadsave), save_partial, paste("omit", as.character(omit), sep = "=")))
         readRDS(save_partial)
       })
         # experiment_validation(

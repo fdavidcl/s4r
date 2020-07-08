@@ -74,24 +74,24 @@ Skaler <- R6::R6Class("Skaler",
       mean_pos <- keras::k_sum(encoding_if_pos, axis = 1) / amount_pos
       mean_neg <- keras::k_sum(encoding_if_neg, axis = 1) / amount_neg
 
-      # this is 0-1 KL divergence, modify for any (discrete) distribution?
-      # KLD is asymmetric, compute both KLD and sum?
-      # would it be better to use mutual information?
+      p_high_given_pos <- keras::k_softmax(mean_pos)
+      p_high_given_neg <- keras::k_softmax(mean_neg)
+      p_high <- keras::k_clip(keras::k_mean(encoding, axis = 1), 0, 1)
+      # p_highest <- keras::k_softmax(mean_encoding)
 
-      # kullback <- mean_pos * (keras::k_log(mean_pos) - keras::k_log(mean_neg)) +
-      #   (1 - mean_pos) * (keras::k_log(1 - mean_pos) - keras::k_log(1 - mean_neg))
+      kld <-
+        keras::k_sum(p_high_given_pos * keras::k_log(
+          p_high_given_pos / (p_high_given_neg + keras::k_epsilon()) + keras::k_epsilon()
+        ) / log(2)) +
+        keras::k_sum(p_high_given_neg * keras::k_log(
+          p_high_given_neg / (p_high_given_pos + keras::k_epsilon()) + keras::k_epsilon()
+        ) / log(2))
+      entropy <- keras::k_mean(
+        -(1 - p_high) * keras::k_log(1 - p_high + keras::k_epsilon()) / log(2) -
+          (p_high) * keras::k_log(p_high + keras::k_epsilon()) / log(2)
+      )
 
-      # leibler <- keras::k_sum(kullback) / encoding$shape[2] + keras::k_epsilon()
-
-      # penalty <- keras::k_tanh(1 / leibler)
-
-      p_pos <- keras::k_softmax(mean_pos)
-      p_neg <- keras::k_softmax(mean_neg)
-
-      kld <- keras::k_sum(p_pos * keras::k_log(p_pos/p_neg))
-      # probar también a usar p_neg
-
-      private$weight * (- kld)
+      private$weight * (- kld - entropy)
     }
   )
 )

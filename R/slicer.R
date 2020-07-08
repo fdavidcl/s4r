@@ -73,7 +73,7 @@ Slicer <- R6::R6Class("Slicer",
 
       weight_reg <- keras::k_sum(svm_weight * svm_weight) / 2
 
-      weight_reg + private$weight * svm_loss
+      private$weight * (weight_reg + svm_loss)
     }
   )
 )
