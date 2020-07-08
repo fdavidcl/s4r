@@ -16,3 +16,11 @@ data.old/
 experiment*/
 checkpoi*/
 *.old
+*.png
+*.arff
+*.csv
+*.pdf
+*.RData
+*.rdb
+*.rdx
+*.
