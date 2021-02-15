@@ -4,7 +4,7 @@ s4r
 Installation
 ------------
 
-# For use
+## For use
 
 In an R session:
 
@@ -12,7 +12,7 @@ In an R session:
 remotes::install_github("fdavidcl/s4r")
 ```
 
-# For development
+## For development
 
 In a shell:
 
@@ -30,3 +30,7 @@ remotes::install_bioc("graph")
 remotes::install_bioc("Rgraphviz")
 devtools::install_dev_deps()
 ```
+
+## Dependencies
+
+- Tensorflow (up to 2.2; 2.4 is not supported)
