@@ -10,7 +10,7 @@ Description: Implementations of custom autoencoders based on the Ruta package:
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: ruta, keras, purrr, scmamp, dcme, cccd, caret, dimRed, ggridges, ggplot2
+Imports: ruta, keras, purrr, scmamp, dcme, cccd, caret, dimRed, ggridges, ggplot2, ECoL, pROC, yarr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.0.2
 Collate: 

@@ -3,7 +3,7 @@ digraph_measures <- function(features, classes) {
   positives <- classes == 1
   negatives <- classes == 0
 
-  cover <- safely(cccd::cccd.classifier)(features[positives, ], features[negatives, ])
+  cover <- safely(cccd::cccd.classifier)(features[positives, ], features[negatives, ], algorithm="kd_tree")
 
   if (is.null(cover$error)) {
     cover <- cover$result

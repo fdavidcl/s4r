@@ -70,20 +70,26 @@ train_reduction <- function(train_x, train_y, method, normalized = TRUE, ...) {
              feature_extractor$encode
            },
            slicer = {
-             weight <- if (is.null(args$weight)) 1 else args$weight
+             weight <- if (is.null(args$weight)) 0.1 else args$weight
              feature_extractor <- Slicer$new(network, loss = loss, weight = weight)
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            skaler = {
-             weight <- if (is.null(args$weight)) 0.1 else args$weight
-             feature_extractor <- Skaler$new(network, loss = loss, weight = weight)
+             weight <- if (is.null(args$weight)) .1 else args$weight
+             feature_extractor <- Skaler$new(network, loss = loss, weight = weight, penalty_type="kld")
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
            skaler3 = {
              weight <- if (is.null(args$weight)) .1 else args$weight
-             feature_extractor <- Skaler$new(network, loss = loss, weight = weight)
+             feature_extractor <- Skaler$new(network, loss = loss, weight = weight, penalty_type="mutualinf")
+             feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
+             feature_extractor$encode
+           },
+           skaler4 = {
+             weight <- if (is.null(args$weight)) .1 else args$weight
+             feature_extractor <- Skaler$new(network, loss = loss, weight = weight, penalty_type="kldsparsity")
              feature_extractor$train(train_x, classes = as.numeric(train_y) - 1, epochs = epochs)
              feature_extractor$encode
            },
@@ -110,7 +116,8 @@ train_classifier <- function(train_x, train_y, classifier) {
     train_x,
     train_y,
     method = classifier,
-    trControl = ctrl
+    trControl = ctrl,
+    num.threads = 1
   )
   if (classifier == "knn") {
     pars["use.all"] <- FALSE
@@ -231,7 +238,7 @@ experiment_validation <- function(
 }
 
 weight_optimization <- function(datasets = dataset_list(except = c("IMDB", "Internet", "Riccardo")),
-                                method = "skaler",
+                                method = "slicer",
                                 weights = 10 ** seq(-4, 2, by = 1),
                                 metric = "knn.fscore",
                                 epochs = 20) {
@@ -242,35 +249,25 @@ weight_optimization <- function(datasets = dataset_list(except = c("IMDB", "Inte
 
   classifier <- if (is_classifier_metric) strsplit(metric, ".", fixed=T)[[1]][1] else character(0)
   metric <- if (is_classifier_metric) strsplit(metric, ".", fixed=T)[[1]][2] else metric
+  verbose <- F
 
   for (d in names(datasets)) {
     for (w in weights) {
       save_partial <- file.path(tempdir(), "partial.rds")
       system2("/usr/bin/env", c("Rscript", "R/validation_proc.R",
-                                d, method, as.character(verbose), as.character(FALSE), as.character(FALSE), save_partial))
-      readRDS(save_partial)
-      # partial <-
-      #   experiment_validation(
-      #     datasets[[d]],
-      #     method = method,
-      #     name = d,
-      #     classifiers = classifier,
-      #     autosave = F,
-      #     loadsave = F,
-      #     weight = w,
-      #     epochs = epochs
-      #   )
-      results[d, w] <-
+                                d, method, as.character(verbose), as.character(FALSE), as.character(FALSE), save_partial, paste0("weight=", w), paste0("epochs=", epochs), "folds=2"))
+      partial <- readRDS(save_partial)
+      results[d, as.character(w)] <-
         if (is_classifier_metric) {
-          print(partial$classifiers[[classifier]][[metric]])
-          partial$classifiers[[classifier]][[metric]] %>% unlist() %>% mean(na.rm = T)
+          partial$classifiers[[classifier]] %>% map(~.[metric]) %>% unlist() %>% mean(na.rm=T)
         } else {
-          print(partial$features)
           partial$features %>% map( ~ .[metric]) %>% unlist() %>% mean(na.rm = T)
         }
+      print(paste(d, w, " | ", results[d, as.character(w)]))
     }
   }
 
+  saveRDS(results, paste0(method, "_weight_opt.rds"))
   results
 }
 
@@ -299,9 +296,9 @@ experiment_all <-
   }
 
   options(keras.fit_verbose = 0)
-  #library(tensorflow)
-  gpu <- tensorflow::tf$config$experimental$get_visible_devices('GPU')[[1]]
-  tensorflow::tf$config$experimental$set_memory_growth(device = gpu, enable = TRUE)
+  # library(tensorflow)
+  # gpu <- tensorflow::tf$config$experimental$get_visible_devices('GPU')[[1]]
+  # tensorflow::tf$config$experimental$set_memory_growth(device = gpu, enable = TRUE)
 
   dir.create(folder, recursive = TRUE)
 
