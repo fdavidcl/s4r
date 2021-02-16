@@ -324,7 +324,10 @@ experiment_all <-
         save_partial <- file.path(folder, paste0(name, "_", m, ".rds"))
         system2("/usr/bin/env", c("Rscript", "R/validation_proc.R",
                 name, m, as.character(verbose), as.character(autosave), as.character(loadsave), save_partial, paste("omit", as.character(omit), sep = "=")))
-        readRDS(save_partial)
+        tryCatch(
+          readRDS(save_partial),
+          error = function(e) NULL
+        )
       })
         # experiment_validation(
         #   dataset_f = dataset_f2,
@@ -335,13 +338,16 @@ experiment_all <-
         #   loadsave = loadsave,
         #   ...
         # ))
-      names(this_dataset) <- methods
+      if (is.null(this_dataset)) {
+        log(name, "will be missing")
+      } else {
+        names(this_dataset) <- methods
 
-      log("All tests ok. Saving...\n")
-      if (autosave) {
-        saveRDS(this_dataset, file = save_name)
+        log("All tests ok. Saving...\n")
+        if (autosave) {
+          saveRDS(this_dataset, file = save_name)
+        }
       }
-
       this_dataset
     }
   })
